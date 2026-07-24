@@ -1,0 +1,8 @@
+{
+  "network": "preprod",
+  "contract": "allowlist",
+  "contractAddress": "d52f2ea7ef3bd9110fb03ca7396a8b10f80b90a55bc84a13f6c9a276cc69a4d7",
+  "transactionHash": "ec8cd898b3031de505a279db4359d189c837863a6953c4ca47be68e3af719da1",
+  "transactionId": 498531,
+  "verifiedBy": "Midnight Preprod indexer"
+}
