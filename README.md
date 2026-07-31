@@ -1,5 +1,7 @@
 # Private NFT Allowlist Portal
 
+![Frontend CI](https://github.com/gaurav190901/private-nft-allowlist/actions/workflows/frontend-ci.yml/badge.svg?branch=main) ![Contract CI](https://github.com/gaurav190901/private-nft-allowlist/actions/workflows/contract-ci.yml/badge.svg?branch=main)
+
 A shielded claim desk for NFT drops where eligibility can be proven from a Merkle path without publishing the allowlist.
 
 ## Drop operator view
@@ -62,3 +64,6 @@ The root and total claims are observable. The claimant’s allowlist leaf, Merkl
 
 Demo: [watch the NFT allowlist walkthrough](https://drive.google.com/file/d/1UhVA8m-EMgurd3PuEdVF9qSIZNPbI8QB/view?usp=sharing).
 
+## Verification
+
+Privacy is the product feature: the allowlist root and aggregate claim state are public, while collector membership paths and claim nullifiers stay private. Run `npm test`, `npm run compile`, and `npm run build`; the five contract scenarios are documented in [TESTING.md](./TESTING.md), the product scope is in [PROPOSAL.md](./PROPOSAL.md), and both CI workflows run on every push and pull request.
