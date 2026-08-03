@@ -29,14 +29,18 @@ Public state includes the current root, aggregate claim counter, and nullifier a
 ## Deployment coordinates
 
 ```text
-Network: Midnight Preprod
+Network: Midnight Preview
 Contract: allowlist
-Address: d52f2ea7ef3bd9110fb03ca7396a8b10f80b90a55bc84a13f6c9a276cc69a4d7
-Deployment transaction: ec8cd898b3031de505a279db4359d189c837863a6953c4ca47be68e3af719da1
-Status: Confirmed by the Midnight Preprod indexer
+Address: 2fe6cdbbc034ba27fd6118d51788797829868f293aa33275cd2eb541400fc7c7
+Deployment transaction: 005ff77fc13ff3b56106f9e5d5db6c5855593ba71e1004a6332aaaab0892ade12c
+Deployer: mn_addr_preview12sstu3je2l2k5s264ppkapmwncczcyactrpqec446z236fvlzdjqpvjyeu
+Deployed at: 2026-08-03T18:47:56.812Z
+Status: Confirmed by the Midnight Preview indexer
 ```
 
 ## Start the drop room locally
+
+Mint-room operators can fund a test wallet through the [Preview faucet](https://faucet.preview.midnight.network/).
 
 ```bash
 npm install
@@ -52,7 +56,7 @@ The deployment helper is intentionally separate from the browser UI:
 npm run deploy
 ```
 
-Only use synthetic leaves, testnet assets, and a Preprod wallet while evaluating the flow.
+Only use synthetic leaves, testnet assets, and a Preview wallet while evaluating the flow.
 
 ## Release discipline
 
