@@ -4,6 +4,15 @@
 
 A shielded claim desk for NFT drops where eligibility can be proven from a Merkle path without publishing the allowlist.
 
+## Drop review kit
+
+| Review item | Direct evidence |
+| --- | --- |
+| Product thesis | [PROPOSAL.md](./PROPOSAL.md) |
+| Merkle/nullifier tests | [src/test/allowlist.test.ts](./src/test/allowlist.test.ts) |
+| Reproduction steps | [TESTING.md](./TESTING.md) |
+| Live contract record | [deployment.json](./deployment.json) |
+
 ## Drop operator view
 
 The portal is designed around a drop manager’s real sequence:

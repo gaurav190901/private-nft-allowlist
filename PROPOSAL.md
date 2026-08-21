@@ -1,5 +1,9 @@
 # Product Proposal: Private NFT Allowlist Portal
 
+**Track:** Tokenized assets  
+**Drop owner:** `gaurav190901`  
+**Release stage:** Functional Preview MVP
+
 ## Problem
 
 NFT drops need membership checks, but publishing the complete collector allowlist leaks customer information.
@@ -25,4 +29,3 @@ The root and aggregate mint count are public. Collector leaf data, Merkle witnes
 - Valid paths claim successfully.
 - Invalid paths fail.
 - Duplicate claims are rejected.
-
