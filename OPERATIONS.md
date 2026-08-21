@@ -1,0 +1,28 @@
+# Operations runbook — Private NFT Allowlist
+
+## Release gate
+
+Run `npm ci`, `npm run verify:repository`, `npm test`, and `npm run build`. Both GitHub workflows must be green. Confirm that `public/deployment.json` exactly matches the root deployment record and that the production build contains no enabled demo mode.
+
+## Before opening the app
+
+1. Select Midnight **Preview** in the wallet.
+2. Confirm contract `allowlist` and its address against `deployment.json`.
+3. Confirm the wallet has sufficient NIGHT/DUST and is synchronized.
+4. Load every proving/verifier asset from `public/midnight/allowlist`.
+5. Execute one low-risk canary call and retain its finalized transaction ID.
+
+## Health signals
+
+Watch wallet detection, indexer connectivity, proving-asset HTTP failures, proof generation duration, rejected/partial transactions, and stale public ledger state. Diagnostics must exclude private inputs.
+
+## Incident response
+
+Close the claim window, snapshot the active allowlist root, rotate the root through an authorized operator, and notify claimants without publishing membership data.
+
+Recovery is complete only after the configured deployment validates, a canary transaction finalizes successfully, ledger state is read from the chain, CI is green, and the incident record contains no private data.
+
+## Rollback
+
+Roll back the frontend to the last green owner-authored release. A frontend rollback does not roll back ledger state. Contract changes require a new independent deployment and a deliberate update to all deployment evidence.
+
