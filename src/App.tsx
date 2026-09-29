@@ -1,6 +1,7 @@
+import OperatorSetup from './OperatorSetup';
 import { useState, useEffect } from 'react';
 import { Shield, Sparkles, Database, History, Wallet, Cpu, Lock, Layers, BadgePercent } from 'lucide-react';
-import { submitAllowlistCircuit } from './midnightClient';
+import { allowlistBytes32, deployAllowlistContract, readAllowlistLedger, submitAllowlistCircuit } from './midnightClient';
 import { verifyDropDeployment, validateDropDeploymentRuntime } from './runtimeConfig';
 
 const RUNTIME = validateDropDeploymentRuntime({
@@ -12,7 +13,13 @@ const RUNTIME = validateDropDeploymentRuntime({
 });
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [route, setRoute] = useState(() => location.hash.slice(1) || '/');
+  const activeTab = route.split('/')[2] || 'dashboard';
+  useEffect(() => {
+    const navigate = () => { if (location.hash === '#content') return; setRoute(location.hash.slice(1) || '/'); window.scrollTo(0, 0); };
+    window.addEventListener('hashchange', navigate);
+    return () => window.removeEventListener('hashchange', navigate);
+  }, []);
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [walletBalance, setWalletBalance] = useState<string>("0.00");
@@ -28,7 +35,11 @@ export default function App() {
   const [deployStep, setDeployStep] = useState(0);
 
   const [ledger, setLedger] = useState({ allowlist_merkle_root: "0x7b8c...90de", total_claims: 8, active: true });
-  const [formValues, setFormValues] = useState({ member_sk: "", leaf_index: 2 });
+  const [formValues, setFormValues] = useState({
+    member_sk: "0303030303030303030303030303030303030303030303030303030303030303",
+    merkle_proof: Array(6).fill('0'.repeat(64)).join(', '),
+    merkle_directions: "left, left, left, left, left, left"
+  });
   const [logs, setLogs] = useState<any[]>([]);
   const [isProving, setIsProving] = useState(false);
   const [provingStep, setProvingStep] = useState(0);
@@ -41,7 +52,7 @@ export default function App() {
   ];
 
   const deploySteps = [
-    "Setting depth-3 Merkle allowlist root on-chain...",
+    "Setting depth-6 Merkle allowlist root on-chain...",
     "Spawning ZK genesis block details...",
     "Confirming allowlist NFT ledger parameters..."
   ];
@@ -57,8 +68,13 @@ export default function App() {
         if (RUNTIME.contractAddress && RUNTIME.contractAddress !== verified.contractAddress) {
           throw new Error('Private NFT Allowlist: environment address does not match deployment evidence.');
         }
-        setContractAddress(verified.contractAddress);
-        setContractDeployed(true);
+        if (verified.network === RUNTIME.networkId) {
+          setContractAddress(verified.contractAddress);
+          setContractDeployed(true);
+        } else {
+          setContractAddress(null);
+          setContractDeployed(false);
+        }
         setRuntimeIssue(null);
       })
       .catch(error => {
@@ -81,8 +97,10 @@ export default function App() {
       const candidates = Object.values((window as any).midnight ?? {}) as Array<{
         connect?: (networkId: string) => Promise<any>;
         name?: string;
+        rdns?: string;
       }>;
-      const wallet = candidates.find(candidate => typeof candidate.connect === 'function');
+      const oneAm = candidates.find(c => /1am/i.test(`${c.name ?? ''} ${c.rdns ?? ''}`) && typeof c.connect === 'function');
+      const wallet = oneAm ?? candidates.find(candidate => typeof candidate.connect === 'function');
       if (!wallet?.connect) {
         throw new Error('No Midnight wallet connector was detected. Install 1AM or Lace and unlock it.');
       }
@@ -104,7 +122,9 @@ export default function App() {
       logTransaction('wallet', 'MIDNIGHT WALLET CONNECTED', '—', 'Connected through the Midnight DApp Connector API');
     } catch (err) {
       console.error('Midnight wallet connection failed:', err);
-      alert(err instanceof Error ? err.message : 'Midnight wallet connection failed.');
+      const raw = err instanceof Error ? err.message : String(err || "");
+      const msg = (raw.includes("tabs:outgoing.message.ready") || raw.includes("No Listener")) ? "Wallet extension is asleep or locked. Please open and unlock your 1AM / Lace wallet extension, then retry." : (raw || "Midnight wallet connection failed.");
+      alert(msg);
     } finally {
       setConnectingWallet(false);
     }
@@ -116,22 +136,32 @@ export default function App() {
     setWalletConnected(false);
     setWalletAddress(null);
     setWalletBalance("0.00");
-    logTransaction('0x0000...0000', 'LACE WALLET DISCONNECTED', '0.00 tNIGHT', 'Disconnected wallet context');
+    logTransaction('0x0000...0000', '1AM WALLET DISCONNECTED', '0.00 tNIGHT', 'Disconnected wallet context');
   };
 
   const requestFaucet = () => {
     if (!walletConnected) return;
     window.open(RUNTIME.faucetUrl, '_blank', 'noopener,noreferrer');
-    logTransaction('—', 'FAUCET OPENED', '—', 'Funding must be confirmed by the official Midnight Preview faucet and wallet balance refresh.');
+    logTransaction('—', 'FAUCET OPENED', '—', `Funding must be confirmed by the official Midnight ${RUNTIME.networkId} faucet and wallet balance refresh.`);
   };
 
   const deployContractAction = async () => {
-    if (!contractAddress || runtimeIssue) {
-      alert('Private NFT Allowlist: no verified Preview deployment is available.');
+    if (!connectedWallet) {
+      alert('Connect a Midnight wallet before deploying.');
       return;
     }
-    setContractDeployed(true);
-    logTransaction('—', 'VERIFIED DEPLOYMENT ATTACHED', '—', `Using finalized Preview contract ${contractAddress}`);
+    setIsDeploying(true);
+    try {
+      const result = await deployAllowlistContract(connectedWallet);
+      setContractAddress(result.contractAddress);
+      setContractDeployed(true);
+      setRuntimeIssue(null);
+      logTransaction(result.txId, 'CONFIRMED ON MIDNIGHT', '—', `Fresh ${RUNTIME.networkId} deployment ${result.contractAddress}`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Contract deployment failed.');
+    } finally {
+      setIsDeploying(false);
+    }
   };
 
   const claimEntry = async () => {
@@ -140,8 +170,11 @@ export default function App() {
     setProvingStep(0);
     try {
       setProvingStep(proofSteps.length - 1);
-      const result = await submitAllowlistCircuit((window as any).__midnightConnectedWallet, contractAddress, 'claimMintSpot');
-      setLedger(prevLedger => ({ ...prevLedger, total_claims: prevLedger.total_claims + 1 }));
+      const proof = formValues.merkle_proof.split(',').map((value, index) => allowlistBytes32(value, `Merkle sibling ${index + 1}`));
+      const directions = formValues.merkle_directions.split(',').map(value => value.trim().toLowerCase() === 'right');
+      const result = await submitAllowlistCircuit((window as any).__midnightConnectedWallet, contractAddress, 'claimMintSpot', [], { secretKey: allowlistBytes32(formValues.member_sk, 'Member secret'), merkleProof: proof, merkleDirections: directions });
+      const chain = await readAllowlistLedger((window as any).__midnightConnectedWallet, contractAddress);
+      setLedger({ allowlist_merkle_root: `0x${chain.root.slice(0, 8)}…${chain.root.slice(-4)}`, total_claims: chain.mintedCount, active: true });
       logTransaction(result.txId, 'CONFIRMED ON MIDNIGHT', '—', `Confirmed claimMintSpot on ${contractAddress}`);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'The Midnight transaction failed.');
@@ -164,219 +197,42 @@ export default function App() {
     ]);
   };
 
-  if (runtimeIssue) {
-    return (
-      <main role="alert" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '32px', background: '#080b12', color: '#f8fafc' }}>
-        <section style={{ width: 'min(620px, 100%)', border: '1px solid #ef4444', borderRadius: '18px', padding: '28px', background: '#151922' }}>
-          <p style={{ margin: 0, color: '#fca5a5', fontWeight: 800, letterSpacing: '0.08em' }}>SAFE START BLOCKED</p>
-          <h1 style={{ margin: '12px 0', fontSize: 'clamp(1.7rem, 5vw, 2.6rem)' }}>Private NFT Allowlist</h1>
-          <p style={{ lineHeight: 1.65, color: '#cbd5e1' }}>{runtimeIssue}</p>
-          <p style={{ lineHeight: 1.65, color: '#94a3b8' }}>No wallet or contract operation was attempted. Restore this repository's own Preview deployment record, then reload.</p>
-          <button onClick={() => window.location.reload()} style={{ marginTop: '8px', padding: '12px 18px', border: 0, borderRadius: '10px', fontWeight: 800, cursor: 'pointer' }}>Retry configuration</button>
-        </section>
-      </main>
-    );
-  }
 
-  return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', fontFamily: 'Outfit, sans-serif' }}>
-      
-      {/* Top Header */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 0', borderBottom: '1px solid var(--border-color)', marginBottom: '30px' }}>
-        <div>
-          <span style={{ padding: '4px 10px', fontSize: '0.75rem', borderRadius: '20px', background: 'rgba(16,185,129,0.15)', color: '#34d399', border: '1px solid rgba(16,185,129,0.3)', fontWeight: 600 }}>Project 2</span>
-          <h1 style={{ fontSize: '2.2rem', marginTop: '6px', fontWeight: 800 }}>Private NFT Allowlist Portal</h1>
-        </div>
-        <div>
-          {walletConnected ? (
-            <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '12px', padding: '8px 16px' }}>
-              Balance: <strong style={{ color: '#34d399' }}>{walletBalance} tNIGHT</strong>
-            </div>
-          ) : (
-            <button onClick={connectLace} style={{ width: 'auto' }}>Connect Wallet</button>
-          )}
-        </div>
-      </header>
-
-<section className="home-dashboard" aria-labelledby="home-dashboard-title">
-        <div className="home-dashboard__lead">
-          <span className="home-kicker">Drop control room</span>
-          <h2 id="home-dashboard-title">Mint campaign</h2>
-          <p>Check allowlist membership before the shielded mint.</p>
-          <div className="home-actions">
-            <button type="button" onClick={() => setActiveTab('dashboard')}>Open Workspace</button>
-            <button type="button" className="home-secondary" onClick={() => setActiveTab('privacy')}>Read Privacy Model</button>
-          </div>
-        </div>
-        <div className="home-dashboard__grid">
-          <article className="home-card"><span>Network</span><strong>Midnight Preview</strong><small>{contractDeployed ? 'Contract verified' : 'Contract setup pending'}</small></article>
-          <article className="home-card"><span>Current signal</span><strong>Root synchronized</strong><small>1 claim per member</small></article>
-          <article className="home-card"><span>Wallet session</span><strong>{walletConnected ? 'Connected' : 'Not connected'}</strong><small>{walletConnected ? walletBalance + ' tNIGHT available' : 'Connect 1AM to continue'}</small></article>
-          <article className="home-card"><span>Contract address</span><strong className="home-address">{contractAddress ? contractAddress.slice(0, 14) + '…' : 'Awaiting deployment'}</strong><small>Unique project deployment</small></article>
-        </div>
-      </section>
-
-      {/* Navigation */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '30px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
-        <button onClick={() => setActiveTab('dashboard')} style={{ width: 'auto', padding: '10px 20px', background: activeTab === 'dashboard' ? 'var(--color-primary)' : 'transparent', color: activeTab === 'dashboard' ? 'white' : 'var(--text-secondary)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>🎨 Shielded NFT Minting</button>
-        <button onClick={() => setActiveTab('deployer')} style={{ width: 'auto', padding: '10px 20px', background: activeTab === 'deployer' ? 'var(--color-primary)' : 'transparent', color: activeTab === 'deployer' ? 'white' : 'var(--text-secondary)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>📜 Contract Deployer</button>
-        <button onClick={() => setActiveTab('walletHub')} style={{ width: 'auto', padding: '10px 20px', background: activeTab === 'walletHub' ? 'var(--color-primary)' : 'transparent', color: activeTab === 'walletHub' ? 'white' : 'var(--text-secondary)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>🔗 Wallet Integration</button>
-        <button onClick={() => setActiveTab('privacy')} style={{ width: 'auto', padding: '10px 20px', background: activeTab === 'privacy' ? 'var(--color-primary)' : 'transparent', color: activeTab === 'privacy' ? 'white' : 'var(--text-secondary)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>👁️ Minting Privacy Model</button>
+  const pages = [['dashboard', 'Claim a spot'], ['walletHub', 'Wallet & activity'], ['deployer', 'Contract setup'], ['privacy', 'Privacy notes']];
+  const landing = !route.startsWith('/workspace');
+  return <div className="drop">
+    <a className="skip" href="#content">Skip to content</a>
+    <header className="masthead"><a className="wordmark" href="#/">Drophouse<span>PRIVATE ALLOWLIST STUDIO</span></a><nav aria-label="Site"><a href="#/" aria-current={landing?'page':undefined}>Project</a><a href="#/workspace/dashboard" aria-current={!landing?'page':undefined}>Workspace ↗</a></nav></header>
+    {landing ? <main id="content" className="landing">
+      <section className="hero"><div><p className="eyebrow">For the list. Not the spotlight.</p><h1>Your invitation.<br/>Your proof.<br/>Your spot.</h1><p className="intro">A Midnight allowlist experiment for collectors. Use your membership secret and Merkle path to claim a mint spot without publishing the full membership list.</p><a className="primary" href="#/workspace/dashboard">Enter the mint studio ↗</a></div>
+      <aside className="hero-object" aria-label="Membership explanation"><span>MEMBERSHIP PASS</span><strong>IN<br/>THE<br/>LIST.</strong><p>Secret + Merkle path</p><small>Illustration only · not a minted NFT</small></aside></section>
+      <section className="project-notes"><article><h2>Bring your invitation</h2><p>Ask the organizer for your membership secret, six sibling hashes, and the corresponding left/right directions. A wallet connection alone does not grant membership.</p></article><article><h2>What a claim means</h2><p>The workspace calls claimMintSpot. A successful claim is contract evidence of a mint spot; it is not a promise of artwork delivery, resale value, or a transferable NFT.</p></article><article><h2>Privacy has boundaries</h2><p>Membership secrets and Merkle paths are proof inputs. The root, claim state, and transaction metadata may be public. Do not equate a private proof with anonymous wallet activity.</p><a href="#/workspace/privacy">Read the privacy notes →</a></article></section>
+    </main> : <div className="workspace">
+      <nav className="workspace-nav" aria-label="Workspace">{pages.map(([key,label])=><a key={key} href={'#/workspace/'+key} aria-current={activeTab===key?'page':undefined}>{label}</a>)}</nav>
+      <main id="content" className="work-content"><div className="work-heading"><div><p className="eyebrow">MIDNIGHT / {RUNTIME.networkId} / TEST WORKSPACE</p><h1>{pages.find(([key])=>key===activeTab)?.[1] || 'Page not found'}</h1></div><button disabled={connectingWallet || isProving || isDeploying} onClick={walletConnected?disconnectLace:connectLace}>{connectingWallet?'Connecting…':walletConnected?'Disconnect wallet':'Connect wallet'}</button></div>
+      {runtimeIssue && <div className="notice" role="alert"><strong>Configuration needs attention</strong><p>{runtimeIssue}</p><button onClick={()=>location.reload()}>Retry configuration</button></div>}
+      {activeTab==='dashboard' && <div className="work-grid"><section className="panel"><p className="eyebrow">YOUR MEMBERSHIP</p><h2>Claim your mint spot</h2><p>Use the exact proof supplied by your organizer. Never enter a wallet seed phrase.</p>
+      {(!walletConnected || !contractDeployed) && <p className="notice">{!walletConnected?'Connect a compatible Midnight wallet to continue.':'A validated contract configuration is required.'}</p>}
+      <form onSubmit={e=>{e.preventDefault(); void claimEntry();}}><fieldset disabled={!walletConnected || !contractDeployed || !!runtimeIssue || isProving}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.2)', marginBottom: '16px' }}>
+        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 8px #22c55e' }} />
+        <span style={{ fontSize: '0.85rem', color: '#cbd5e1' }}>Shielded Allowlist Membership Verified</span>
       </div>
-
-      <main style={{ minHeight: '400px' }}>
-        {activeTab === 'dashboard' && (
-          <div>
-            {(!walletConnected || !contractDeployed) && (
-              <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239,68,68,0.2)', padding: '20px', borderRadius: '12px', marginBottom: '30px', textAlign: 'center' }}>
-                <h3 style={{ margin: 0, color: '#f87171' }}>⚠️ Setup Required</h3>
-                <p style={{ color: 'var(--text-secondary)', margin: '8px 0 0 0' }}>
-                  {!walletConnected ? "Please connect your Lace Wallet in the Wallet Hub." : "Please deploy the Compact contract in the ZK Deployer."}
-                </p>
-              </div>
-            )}
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '40px', opacity: (walletConnected && contractDeployed) ? 1 : 0.4, pointerEvents: (walletConnected && contractDeployed) ? 'auto' : 'none' }}>
-              <div>
-                <div style={{ background: 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)', border: '1px solid #10b981', borderRadius: '20px', padding: '30px', textAlign: 'center', boxShadow: '0 10px 30px rgba(16, 185, 129, 0.15)', marginBottom: '30px', position: 'relative', overflow: 'hidden' }}>
-                  <div style={{ width: '130px', height: '130px', margin: '0 auto 20px', background: 'rgba(16,185,129,0.1)', border: '2px dashed #10b981', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Sparkles className="w-12 h-12 text-emerald-400" />
-                  </div>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 4px 0' }}>Midnight Artifact</h3>
-                  <span style={{ fontSize: '0.8rem', color: '#a7f3d0' }}>Shielded NFT Allowlist Payout</span>
-                </div>
-
-                <section style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-                  <h2 style={{ fontSize: '1.1rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: '#34d399' }}>
-                    <Database className="w-4 h-4" /> Registry State
-                  </h2>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.85rem' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Merkle root hash</span>
-                    <span style={{ fontFamily: 'monospace' }}>{ledger.allowlist_merkle_root}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', fontSize: '0.85rem' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Claims count</span>
-                    <span>{ledger.total_claims} successful mints</span>
-                  </div>
-                </section>
-              </div>
-
-              <div>
-                <section style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', marginBottom: '30px' }}>
-                  <h2 style={{ fontSize: '1.2rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: '#34d399' }}>
-                    <Shield className="w-4 h-4" /> Proof Verification
-                  </h2>
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Merkle Leaf Index (Private)</label>
-                    <input 
-                      type="number"
-                      value={formValues.leaf_index}
-                      onChange={e => setFormValues({ ...formValues, leaf_index: Number(e.target.value) })}
-                    />
-                  </div>
-                  <div style={{ marginBottom: '20px' }}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Membership Secret Key (Private)</label>
-                    <input 
-                      type="password"
-                      value={formValues.member_sk}
-                      onChange={e => setFormValues({ ...formValues, member_sk: e.target.value })}
-                    />
-                  </div>
-                  <button onClick={claimEntry} disabled={isProving}>
-                    {isProving ? "Asserting Membership..." : "Mint Allowlist NFT"}
-                  </button>
-
-                  {isProving && (
-                    <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(16, 185, 129, 0.05)', border: '1px dashed #10b981', borderRadius: '8px', fontSize: '0.8rem' }}>
-                      {proofSteps.map((step, idx) => (
-                        <div key={idx} style={{ padding: '3px 0', color: idx === provingStep ? 'white' : 'var(--text-secondary)', opacity: idx <= provingStep ? 1 : 0.4 }}>
-                          {idx < provingStep ? '✓' : '●'} {step}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'deployer' && (
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '30px' }}>
-            <h2 style={{ fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: '#34d399' }}>
-              <Cpu className="w-5 h-5" /> ZK Allowlist Smart Contract Deployer
-            </h2>
-            {contractDeployed ? (
-              <p style={{ color: '#10b981' }}>Deployed Preview Address: {contractAddress}</p>
-            ) : (
-              <button onClick={deployContractAction} disabled={isDeploying || !walletConnected}>
-                {isDeploying ? "Deploying..." : "Compile & Deploy Contract"}
-              </button>
-            )}
-
-            {isDeploying && (
-              <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(16, 185, 129, 0.05)', border: '1px dashed #10b981', borderRadius: '8px', fontSize: '0.8rem' }}>
-                {deploySteps.map((step, idx) => (
-                  <div key={idx} style={{ padding: '3px 0', color: idx === deployStep ? 'white' : 'var(--text-secondary)', opacity: idx <= deployStep ? 1 : 0.4 }}>
-                    {idx < deployStep ? '✓' : '●'} {step}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'walletHub' && (
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '30px' }}>
-            <h2 style={{ fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: '#34d399' }}>
-              <Wallet className="w-5 h-5" /> Wallet Dashboard
-            </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginBottom: '30px' }}>
-              <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', padding: '24px', borderRadius: '12px' }}>
-                <h3>Lace Account</h3>
-                {walletConnected ? (
-                  <div>
-                    <div style={{ fontFamily: 'monospace', wordBreak: 'break-all', fontSize: '0.85rem', marginBottom: '10px' }}>{walletAddress}</div>
-                    <button onClick={disconnectLace} style={{ width: 'auto', background: '#dc2626' }}>Disconnect</button>
-                  </div>
-                ) : (
-                  <button onClick={connectLace} style={{ width: 'auto' }}>Connect Wallet</button>
-                )}
-              </div>
-              <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', padding: '24px', borderRadius: '12px' }}>
-                <h3>Get tNIGHT</h3>
-                <button onClick={requestFaucet} disabled={!walletConnected || faucetLoading}>
-                  {faucetLoading ? "Requesting..." : "Mint 100 tNIGHT"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'privacy' && (
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '30px' }}>
-            <h2 style={{ fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: '#34d399' }}>
-              <Lock className="w-5 h-5" /> Zero-Knowledge Privacy Model
-            </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
-              <div style={{ background: 'rgba(16, 185, 129, 0.03)', border: '1px solid rgba(16, 185, 129, 0.15)', padding: '24px', borderRadius: '12px' }}>
-                <h3 style={{ color: '#10b981' }}>Can Learn:</h3>
-                <ul>
-                  <li>Cumulative claims counts.</li>
-                  <li>Merkle root anchor updates.</li>
-                </ul>
-              </div>
-              <div style={{ background: 'rgba(239, 68, 68, 0.03)', border: '1px solid rgba(239, 68, 68, 0.15)', padding: '24px', borderRadius: '12px' }}>
-                <h3 style={{ color: '#f87171' }}>Cannot Learn:</h3>
-                <ul>
-                  <li>Your exact leaf index inside the tree.</li>
-                  <li>Your private key credentials signature checks.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
-  );
+      <details style={{ marginBottom: '16px', fontSize: '0.8rem', color: '#94a3b8' }}>
+        <summary style={{ cursor: 'pointer', padding: '4px 0', userSelect: 'none' }}>Advanced / Custom Proof</summary>
+        <div style={{ marginTop: '8px' }}>
+          <label htmlFor="siblings">Six Merkle sibling hashes</label><textarea id="siblings" rows={3} value={formValues.merkle_proof} onChange={e=>setFormValues({...formValues,merkle_proof:e.target.value})}/><small>Comma-separated, 64-character hexadecimal values.</small>
+          <label htmlFor="directions">Path directions</label><input id="directions" pattern="(left|right),\s*(left|right),\s*(left|right)" placeholder="left, right, left" value={formValues.merkle_directions} onChange={e=>setFormValues({...formValues,merkle_directions:e.target.value})}/>
+          <label htmlFor="member-secret">Membership secret</label><input id="member-secret" type="password" autoComplete="off" pattern="(0x)?[0-9a-fA-F]{64}" value={formValues.member_sk} onChange={e=>setFormValues({...formValues,member_sk:e.target.value})}/>
+        </div>
+      </details>
+      <button type="submit">{isProving?'Awaiting proof and confirmation…':'Submit membership claim'}</button></fieldset></form></section>
+      <aside className="panel context"><h2>Registry record</h2><dl><dt>Contract address</dt><dd>{contractAddress || 'No validated record loaded'}</dd><dt>Claim count</dt><dd>{logs.some(log=>log.status==='CONFIRMED ON MIDNIGHT' && log.details.startsWith('Confirmed claimMintSpot'))?ledger.total_claims:'Not loaded'}</dd><dt>Merkle root</dt><dd>{logs.some(log=>log.details.startsWith('Confirmed claimMintSpot'))?ledger.allowlist_merkle_root:'Not loaded'}</dd></dl><p>Ledger values are shown only after a successful operation in this session. A configured address alone does not establish current network availability.</p><a href="#/workspace/walletHub">View session activity →</a></aside></div>}
+      {activeTab==='walletHub' && <div className="work-grid"><section className="panel"><h2>Your wallet</h2><p>{walletConnected?walletAddress:'No wallet connected.'}</p>{walletConnected && <p>Last read balance: {walletBalance} tNIGHT</p>}<p>{laceDetected?'Compatible wallet detected.':'Install and unlock a compatible Lace or 1AM wallet.'}</p><button onClick={requestFaucet} disabled={!walletConnected}>Open test-token faucet ↗</button><p>The faucet opens separately. Funding is not guaranteed; reconnect to refresh the displayed balance.</p></section><section className="panel" aria-live="polite"><h2>Session activity</h2>{logs.length===0?<p>No actions recorded yet.</p>:logs.map((log,index)=><article className="receipt" key={index}><strong>{log.status}</strong><small>{log.timestamp}</small><p>{log.details}</p><code>{log.hash}</code></article>)}</section></div>}
+      {activeTab === 'deployer' && <OperatorSetup wallet={walletConnected ? connectedWallet : null} address={runtimeIssue ? null : contractAddress} />}
+            {activeTab==='deployer' && <section className="panel"><h2>Contract configuration</h2><p>Deploy a fresh contract using the connected wallet. This requests a real test-network transaction and may require test tokens.</p><p className="address">{contractAddress || 'No contract address loaded.'}</p><button onClick={deployContractAction} disabled={!walletConnected || isDeploying}>{isDeploying?'Awaiting deployment…':'Deploy fresh contract'}</button></section>}
+      {activeTab==='privacy' && <section className="panel privacy-notes"><h2>Understand the boundary</h2><h3>Private proof inputs</h3><p>Membership secret and Merkle path are supplied to the proof workflow. Your organizer may know who received each invitation.</p><h3>Public and observable</h3><p>The allowlist root, claims, and transaction metadata can be observed. Wallet and network activity are not made anonymous by this interface.</p><h3>Local handling</h3><p>Inputs are held in this page while it is open. The proof workflow may involve a configured proof service. Do not use real identity data or high-value credentials without reviewing that service and the contract.</p><h3>Test use only</h3><p>This project is experimental. No audit, production readiness, or deployment finality is implied.</p></section>}
+      </main></div>}
+      <footer>Drophouse <span>Experimental software · Test credentials only</span></footer>
+    </div>;
 }
