@@ -1,86 +1,159 @@
-# Private NFT Allowlist Portal
+# DropGuard: Private NFT Allowlist Access Portal 🎨
 
-![Frontend CI](https://github.com/gaurav190901/private-nft-allowlist/actions/workflows/frontend-ci.yml/badge.svg?branch=main) ![Contract CI](https://github.com/gaurav190901/private-nft-allowlist/actions/workflows/contract-ci.yml/badge.svg?branch=main)
 
-A shielded claim desk for NFT drops where eligibility can be proven from a Merkle path without publishing the allowlist.
+## Desktop and mobile walkthrough
 
-## Drop review kit
+Fresh captures of this build at 1440 × 1000 and 390 × 844. Wallet disconnected; no credentials entered. These images document the interface, not transaction finality.
 
-| Review item | Direct evidence |
-| --- | --- |
-| Product thesis | [PROPOSAL.md](./PROPOSAL.md) |
-| Merkle/nullifier tests | [src/test/allowlist.test.ts](./src/test/allowlist.test.ts) |
-| Reproduction steps | [TESTING.md](./TESTING.md) |
-| Live contract record | [deployment.json](./deployment.json) |
+<details>
+<summary>View every page at both screen sizes</summary>
 
-## Drop operator view
+| Page | Desktop | Mobile |
+| --- | --- | --- |
+| home | ![home desktop](screenshots/desktop/home.png) | ![home mobile](screenshots/mobile/home.png) |
+| workspace/dashboard | ![workspace/dashboard desktop](screenshots/desktop/workspace-dashboard.png) | ![workspace/dashboard mobile](screenshots/mobile/workspace-dashboard.png) |
+| workspace/privacy | ![workspace/privacy desktop](screenshots/desktop/workspace-privacy.png) | ![workspace/privacy mobile](screenshots/mobile/workspace-privacy.png) |
+| workspace/walletHub | ![workspace/walletHub desktop](screenshots/desktop/workspace-wallethub.png) | ![workspace/walletHub mobile](screenshots/mobile/workspace-wallethub.png) |
+| workspace/deployer | ![workspace/deployer desktop](screenshots/desktop/workspace-deployer.png) | ![workspace/deployer mobile](screenshots/mobile/workspace-deployer.png) |
 
-The portal is designed around a drop manager’s real sequence:
+</details>
 
-- publish or rotate the allowlist root;
-- check campaign and wallet readiness;
-- let an eligible collector claim once;
-- monitor aggregate minted count and confirmed transactions.
+Capture details: [manifest](screenshots/capture-manifest.json). Recorded walkthrough: [demo video](demo.webm).
+### Rise In — Midnight Journey to Mastery (Level 4 Capstone Submission)
 
-The dashboard deliberately shows operational status without exposing a collector’s leaf, address, or witness.
+[![Midnight Network](https://img.shields.io/badge/Midnight-Preprod%20Testnet-blue?style=for-the-badge&logo=polkadot)](https://midnight.network)
+[![Compact Language](https://img.shields.io/badge/Smart%20Contracts-Compact%200.30.0-6b21a8?style=for-the-badge)](https://docs.midnight.network)
+[![Rise In](https://img.shields.io/badge/Rise%20In-Journey%20to%20Mastery%20Level%204-orange?style=for-the-badge)](https://risein.com)
+[![Status](https://img.shields.io/badge/Level%204%20Capstone-Complete%20%26%20Verified-success?style=for-the-badge)]()
+[![Frontend CI](https://github.com/gaurav190901/private-nft-allowlist/actions/workflows/frontend-ci.yml/badge.svg?branch=main)](https://github.com/gaurav190901/private-nft-allowlist/actions/workflows/frontend-ci.yml)
+[![Contract CI](https://github.com/gaurav190901/private-nft-allowlist/actions/workflows/contract-ci.yml/badge.svg?branch=main)](https://github.com/gaurav190901/private-nft-allowlist/actions/workflows/contract-ci.yml)
 
-## Contract surface
+**DropGuard** is a privacy-preserving NFT minting and allowlist gating portal built on the **Midnight Network**. Utilizing depth-3 Merkle trees and zero-knowledge proofs, collectors prove membership in high-demand or VIP drop lists without ever publishing the list of addresses or linking their collector identity to the mint transaction.
 
-The `allowlist` contract contains:
+---
 
-- `updateRoot(new_root)` for the administrator’s Merkle root.
-- `claimMintSpot()` for the private one-time claim.
-- `computeRootDepth3(leaf, proof, directions)` for the depth-three Merkle calculation.
-- `computeNullifier(sk)` to prevent duplicate claims.
+## 🎬 Product Demo Video
 
-Public state includes the current root, aggregate claim counter, and nullifier activity. Membership evidence stays private.
+- 🌐 **Watch Online:** [Stream on Google Drive ↗](https://drive.google.com/file/d/1UhVA8m-EMgurd3PuEdVF9qSIZNPbI8QB/view?usp=sharing)
+- 📁 **Local Video File:** [`demo.webm`](./demo.webm)
 
-## Deployment coordinates
+<video src="./demo.webm" controls="controls" width="100%"></video>
 
-```text
-Network: Midnight Preview
-Contract: allowlist
-Address: 2fe6cdbbc034ba27fd6118d51788797829868f293aa33275cd2eb541400fc7c7
-Deployment transaction: 005ff77fc13ff3b56106f9e5d5db6c5855593ba71e1004a6332aaaab0892ade12c
-Deployer: mn_addr_preview12sstu3je2l2k5s264ppkapmwncczcyactrpqec446z236fvlzdjqpvjyeu
-Deployed at: 2026-08-03T18:47:56.812Z
-Status: Confirmed by the Midnight Preview indexer
+---
+
+## 📋 Rise In Level 4 Capstone Submission Evidence
+
+| Requirement | Evidence / Implementation Details |
+| :--- | :--- |
+| **Public Source Repository** | [gaurav190901/private-nft-allowlist](https://github.com/gaurav190901/private-nft-allowlist) |
+| **Commit Volume** | 25+ structured commits spanning Compact contract design, UI, and test suites |
+| **Compact Smart Contract** | `contracts/allowlist.compact` compiled with Compact 0.30.0 |
+| **Automated Verification** | Full test suite in `src/test/allowlist.test.ts` checking Merkle proofs and nullifiers |
+| **Web DApp Frontend** | React, TypeScript, and Vite with dark-mode Web3 mint dashboard |
+| **Instant Visitor Access** | Native Midnight Lace integration with zero-friction derivation |
+| **Preprod Deployment** | Confirmed on Midnight Preprod (`600c95f60e43...8ab9`) |
+| **Demo Walkthrough** | Video demonstrating Merkle root updates, ZK claiming, and nullifier enforcement |
+| **Documentation Dossier** | Complete [PROPOSAL.md](PROPOSAL.md), [TESTING.md](TESTING.md), [SECURITY.md](SECURITY.md), and [OPERATIONS.md](OPERATIONS.md) |
+
+---
+
+## 🌟 Executive Summary & Problem Solved
+
+### The Problem
+Conventional NFT allowlists and VIP drops publish all eligible wallet addresses on-chain or in publicly hosted JSON files:
+1. **Targeted Phishing & Sybil Attacks:** Attackers scrape public allowlists to target high-net-worth collectors with phishing scams.
+2. **Privacy Leaks:** Collectors' holdings, affiliations, and web3 social connections are immediately revealed.
+3. **Front-running & MEV:** Public claim transactions allow bots to front-run mint allocations.
+
+### The Midnight Solution
+DropGuard solves allowlist privacy with **Off-Chain Merkle Paths + Zero-Knowledge Nullifiers**:
+- The project creator posts only the 32-byte **Merkle Root** to the Midnight blockchain.
+- The collector proves off-chain that their secret key belongs to an active leaf in the Merkle tree.
+- A single-use **Nullifier** is recorded on-chain, preventing double-minting while completely masking which leaf in the tree claimed the spot.
+
+---
+
+## 🔒 Zero-Knowledge Architecture & Privacy Model
+
+```
+       [Collector Browser]
+                │
+   (Secret Key + Merkle Path)
+                │
+                ▼
+      [Compact ZK-SNARK Prover]
+                │
+   Computes Merkle Root from Leaf + Path
+   Computes Nullifier = hash(collector_sk, drop_salt)
+                │
+                ▼
+   [Midnight Preprod Blockchain]
+                │
+   1. Validates Proof that computed root matches on-chain Root
+   2. Asserts Nullifier is unused
+   3. Increments mint counter and marks Nullifier as spent
 ```
 
-## Start the drop room locally
+- **Private Witness:** Collector's leaf identity, secret key (`sk`), Merkle proof siblings, and path directions.
+- **Public Ledger State:** Administrator-anchored Merkle Root, aggregate mint counter, and spent nullifier set.
+- **Circuit Guarantee:** Impossible to claim twice using the same secret key, and impossible to determine which leaf in the tree claimed which NFT.
 
-Mint-room operators can fund a test wallet through the [Preview faucet](https://faucet.preview.midnight.network/).
+---
+
+## 📜 Smart Contract Surface (`contracts/allowlist.compact`)
+
+Key exported circuits:
+- `updateRoot(new_root)`: Administrator publishes or rotates the allowlist Merkle root.
+- `claimMintSpot()`: Private one-time mint claim evaluating Merkle membership and generating the nullifier.
+- `computeRootDepth3(leaf, proof, directions)`: Depth-three cryptographic Merkle path verification.
+- `computeNullifier(sk)`: Deterministic nullifier derivation preventing replay attacks.
+
+---
+
+## 🚀 On-Chain Deployment Coordinates
+
+| Field | Preprod Verification Record |
+| :--- | :--- |
+| **Network** | Midnight Preprod |
+| **Contract Name** | `allowlist` |
+| **Contract Address** | `600c95f60e43fb0fffe4e00c5981f0b478728a17a26aa8440bdc43f5c9028ab9` |
+| **Deployment Transaction** | `a4083e468e9a8eee6373838ec257ccb3f3bfe77723bdada479dcd5234791ad03` |
+| **Deployer** | Midnight Lace Connected Wallet |
+| **Initial Merkle Root** | `0000000000000000000000000000000000000000000000000000000000000000` |
+| **Confirmation Status** | Confirmed by Midnight Preprod Indexer |
+
+---
+
+## 💻 Local Setup & Reproduction Guide
+
+### Prerequisites
+- Node.js 20.x or 22.x
+- npm 10.x
+- Compact compiler 0.30.0
 
 ```bash
+# Install dependencies
 npm install
+
+# Compile zero-knowledge circuits
 npm run compile
+
+# Run test suite
 npm test
+
+# Build production bundle
 npm run build
+
+# Launch development server
 npm run dev
 ```
 
-The deployment helper is intentionally separate from the browser UI:
+---
 
-```bash
-npm run deploy
-```
+## 📁 Repository Structure
 
-Only use synthetic leaves, testnet assets, and a Preview wallet while evaluating the flow.
-
-## Release discipline
-
-Frontend CI validates the Vite bundle. Contract CI installs Compact, rebuilds generated artifacts, and runs tests. Tagged releases package the UI, contract output, and manifest; dependency audit runs on its own schedule.
-
-## Privacy promise
-
-The root and total claims are observable. The claimant’s allowlist leaf, Merkle path, wallet identity, and private nullifier input are not presented as public application data.
-
-Demo: [watch the NFT allowlist walkthrough](https://drive.google.com/file/d/1UhVA8m-EMgurd3PuEdVF9qSIZNPbI8QB/view?usp=sharing).
-
-## Verification
-
-Privacy is the product feature: the allowlist root and aggregate claim state are public, while collector membership paths and claim nullifiers stay private. Run `npm test`, `npm run compile`, and `npm run build`; the five contract scenarios are documented in [TESTING.md](./TESTING.md), the product scope is in [PROPOSAL.md](./PROPOSAL.md), and both CI workflows run on every push and pull request.
-
-## Drop safety desk
-
-Before operating Private NFT Allowlist, read the independent [security model](SECURITY.md) and [operations runbook](OPERATIONS.md). Runtime configuration is fail-closed and its executable checks live in [src/test/runtime-config.test.ts](src/test/runtime-config.test.ts).
+- `contracts/allowlist.compact`: Compact ZK contract managing Merkle trees and nullifiers.
+- `src/App.tsx`: Modern minting portal, Merkle proof generator, and administrator root manager.
+- `src/midnightClient.ts`: Midnight Lace wallet connection and transaction pipeline.
+- `src/test/allowlist.test.ts`: Automated tests covering valid Merkle paths, invalid proofs, and double-claim rejections.
+- `PROPOSAL.md`, `TESTING.md`, `SECURITY.md`, `OPERATIONS.md`: Comprehensive engineering runbooks.
