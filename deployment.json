@@ -1,9 +1,9 @@
 {
   "contractName": "allowlist",
-  "contractAddress": "2fe6cdbbc034ba27fd6118d51788797829868f293aa33275cd2eb541400fc7c7",
-  "network": "preview",
-  "deployedAt": "2026-08-03T18:47:56.812Z",
-  "deployer": "mn_addr_preview12sstu3je2l2k5s264ppkapmwncczcyactrpqec446z236fvlzdjqpvjyeu",
-  "transactionHash": "005ff77fc13ff3b56106f9e5d5db6c5855593ba71e1004a6332aaaab0892ade12c",
+  "contractAddress": "600c95f60e43fb0fffe4e00c5981f0b478728a17a26aa8440bdc43f5c9028ab9",
+  "network": "preprod",
+  "deployedAt": "2026-09-18T08:19:12Z",
+  "deployer": "1AM wallet",
+  "transactionHash": "a4083e468e9a8eee6373838ec257ccb3f3bfe77723bdada479dcd5234791ad03",
   "initialRoot": "0000000000000000000000000000000000000000000000000000000000000000"
 }

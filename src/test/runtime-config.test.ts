@@ -23,9 +23,9 @@ describe('Private NFT Allowlist production configuration', () => {
     expect(() => verifyDropDeployment({ ...deployment, transactionHash: 'pending' })).toThrow(/transaction evidence/);
   });
 
-  it('prevents demo mode and network drift in production', () => {
-    expect(() => validateDropDeploymentRuntime({ networkId: 'preprod' })).toThrow(/Preview/);
+  it('accepts supported networks and prevents simulated production mode', () => {
+    expect(validateDropDeploymentRuntime({ networkId: 'preprod' }).networkId).toBe('preprod');
+    expect(() => validateDropDeploymentRuntime({ networkId: 'invalid-network' })).toThrow(/Preview or Preprod/);
     expect(() => validateDropDeploymentRuntime({ production: true, demoMode: 'true' })).toThrow(/forbidden/);
   });
 });
-

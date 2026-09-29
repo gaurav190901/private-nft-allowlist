@@ -9,14 +9,14 @@ type RuntimeEnvironment = {
 export type VerifiedDeployment = {
   contractName: 'allowlist';
   contractAddress: string;
-  network: 'preview';
+  network: 'preview' | 'preprod';
   transactionHash: string;
   deployedAt: string;
 };
 
 const ADDRESS = /^[0-9a-f]{64}$/i;
-const TRANSACTION = /^[0-9a-f]{66}$/i;
-const PREVIEW_FAUCET = 'https://faucet.preview.midnight.network/';
+const TRANSACTION = /^(?:[0-9a-f]{64}|[0-9a-f]{66})$/i;
+const FAUCETS = { preview: 'https://faucet.preview.midnight.network/', preprod: 'https://faucet.preprod.midnight.network/' } as const;
 
 export function verifyDropDeployment(value: unknown): VerifiedDeployment {
   if (!value || typeof value !== 'object') {
@@ -27,8 +27,8 @@ export function verifyDropDeployment(value: unknown): VerifiedDeployment {
   if (candidate.contractName !== 'allowlist') {
     throw new Error('Private NFT Allowlist: deployment belongs to a different contract.');
   }
-  if (candidate.network !== 'preview') {
-    throw new Error('Private NFT Allowlist: only the independently deployed Preview contract is accepted.');
+  if (candidate.network !== 'preview' && candidate.network !== 'preprod') {
+    throw new Error('Private NFT Allowlist: deployment network must be Preview or Preprod.');
   }
   if (typeof candidate.contractAddress !== 'string' || !ADDRESS.test(candidate.contractAddress)) {
     throw new Error('Private NFT Allowlist: contract address is not a 32-byte hexadecimal address.');
@@ -44,14 +44,12 @@ export function verifyDropDeployment(value: unknown): VerifiedDeployment {
 }
 
 export function validateDropDeploymentRuntime(env: RuntimeEnvironment) {
-  const networkId = env.networkId || 'preview';
-  const faucetUrl = env.faucetUrl || PREVIEW_FAUCET;
+  const networkId = env.networkId || 'preprod';
+  if (networkId !== 'preview' && networkId !== 'preprod') throw new Error('Private NFT Allowlist: wallet network must be Preview or Preprod.');
+  const faucetUrl = env.faucetUrl || FAUCETS[networkId];
 
-  if (networkId !== 'preview') {
-    throw new Error('Private NFT Allowlist: wallet network must be Preview.');
-  }
-  if (faucetUrl !== PREVIEW_FAUCET) {
-    throw new Error('Private NFT Allowlist: faucet host is not the approved Preview faucet.');
+  if (faucetUrl !== FAUCETS[networkId]) {
+    throw new Error('Private NFT Allowlist: faucet host does not match the selected Midnight network.');
   }
   if (env.contractAddress && !ADDRESS.test(env.contractAddress)) {
     throw new Error('Private NFT Allowlist: VITE_CONTRACT_ADDRESS is malformed.');
@@ -62,4 +60,3 @@ export function validateDropDeploymentRuntime(env: RuntimeEnvironment) {
 
   return { networkId, faucetUrl, contractAddress: env.contractAddress || null };
 }
-
