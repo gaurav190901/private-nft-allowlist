@@ -1,0 +1,66 @@
+{
+  "capturedAt": "2026-09-29T03:33:07.779Z",
+  "walletState": "disconnected",
+  "captures": [
+    {
+      "device": "desktop",
+      "page": "home",
+      "file": "screenshots/desktop/home.png",
+      "overflow": false
+    },
+    {
+      "device": "desktop",
+      "page": "workspace/dashboard",
+      "file": "screenshots/desktop/workspace-dashboard.png",
+      "overflow": false
+    },
+    {
+      "device": "desktop",
+      "page": "workspace/privacy",
+      "file": "screenshots/desktop/workspace-privacy.png",
+      "overflow": false
+    },
+    {
+      "device": "desktop",
+      "page": "workspace/walletHub",
+      "file": "screenshots/desktop/workspace-wallethub.png",
+      "overflow": false
+    },
+    {
+      "device": "desktop",
+      "page": "workspace/deployer",
+      "file": "screenshots/desktop/workspace-deployer.png",
+      "overflow": false
+    },
+    {
+      "device": "mobile",
+      "page": "home",
+      "file": "screenshots/mobile/home.png",
+      "overflow": false
+    },
+    {
+      "device": "mobile",
+      "page": "workspace/dashboard",
+      "file": "screenshots/mobile/workspace-dashboard.png",
+      "overflow": false
+    },
+    {
+      "device": "mobile",
+      "page": "workspace/privacy",
+      "file": "screenshots/mobile/workspace-privacy.png",
+      "overflow": false
+    },
+    {
+      "device": "mobile",
+      "page": "workspace/walletHub",
+      "file": "screenshots/mobile/workspace-wallethub.png",
+      "overflow": false
+    },
+    {
+      "device": "mobile",
+      "page": "workspace/deployer",
+      "file": "screenshots/mobile/workspace-deployer.png",
+      "overflow": false
+    }
+  ]
+}
