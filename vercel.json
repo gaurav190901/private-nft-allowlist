@@ -1,6 +1,6 @@
 {
   "cleanUrls": true,
-  "alias": "garry-xrfq.vercel.app",
+  "alias": "drophouse-nine.vercel.app",
   "buildCommand": "npm run build",
   "outputDirectory": "dist"
 }
