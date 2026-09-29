@@ -18,37 +18,16 @@ describe("Private Allowlist Access Smart Contract Tests", () => {
 
   // Helper to build Merkle root and proof dynamically using the simulator's hash circuit
   const buildMerkleTree = (leaves: Uint8Array[], targetIndex: number, simulator: AllowlistSimulator) => {
-    // Level 0
-    const level0 = [...leaves];
-    const sib0 = level0[targetIndex ^ 1];
-    const dir0 = (targetIndex % 2 === 0); // true if sibling is on the right
-
-    // Level 1
-    const level1: Uint8Array[] = [];
-    for (let i = 0; i < 8; i += 2) {
-      level1.push(simulator.hashNodes(level0[i], level0[i + 1]));
+    if (leaves.length !== 64) throw new Error('Expected 64 leaves');
+    let level = [...leaves], index = targetIndex;
+    const proof: Uint8Array[] = [], directions: boolean[] = [];
+    while (level.length > 1) {
+      proof.push(level[index ^ 1]); directions.push(index % 2 === 0);
+      const parents: Uint8Array[] = [];
+      for (let i = 0; i < level.length; i += 2) parents.push(simulator.hashNodes(level[i], level[i + 1]));
+      level = parents; index = Math.floor(index / 2);
     }
-    const parentIndex0 = Math.floor(targetIndex / 2);
-    const sib1 = level1[parentIndex0 ^ 1];
-    const dir1 = (parentIndex0 % 2 === 0);
-
-    // Level 2
-    const level2: Uint8Array[] = [];
-    for (let i = 0; i < 4; i += 2) {
-      level2.push(simulator.hashNodes(level1[i], level1[i + 1]));
-    }
-    const parentIndex1 = Math.floor(parentIndex0 / 2);
-    const sib2 = level2[parentIndex1 ^ 1];
-    const dir2 = (parentIndex1 % 2 === 0);
-
-    // Root
-    const root = simulator.hashNodes(level2[0], level2[1]);
-
-    return {
-      root,
-      proof: [sib0, sib1, sib2],
-      directions: [dir0, dir1, dir2]
-    };
+    return { root: level[0], proof, directions };
   };
 
   it("1. Properly initializes contract parameters and allowlist root", () => {
@@ -74,9 +53,9 @@ describe("Private Allowlist Access Smart Contract Tests", () => {
     const userSecret = randomBytes(32);
     const tempSim = setupSimulator(userSecret, [], [], dummyRoot);
 
-    // We generate 8 leaf public keys. Let's make user public key the third leaf (index 2).
+    // We generate 64 leaf public keys. Let's make user public key the third leaf (index 2).
     const userPk = tempSim.publicKey(userSecret);
-    const mockLeaves = Array.from({ length: 8 }, () => randomBytes(32));
+    const mockLeaves = Array.from({ length: 64 }, () => randomBytes(32));
     mockLeaves[2] = userPk;
 
     // Build Merkle proof
@@ -94,7 +73,7 @@ describe("Private Allowlist Access Smart Contract Tests", () => {
     const tempSim = setupSimulator(userSecret, [], [], dummyRoot);
 
     const userPk = tempSim.publicKey(userSecret);
-    const mockLeaves = Array.from({ length: 8 }, () => randomBytes(32));
+    const mockLeaves = Array.from({ length: 64 }, () => randomBytes(32));
     mockLeaves[2] = userPk;
 
     const { root, proof, directions } = buildMerkleTree(mockLeaves, 2, tempSim);
@@ -112,7 +91,7 @@ describe("Private Allowlist Access Smart Contract Tests", () => {
     const tempSim = setupSimulator(userSecret, [], [], dummyRoot);
 
     const userPk = tempSim.publicKey(userSecret);
-    const mockLeaves = Array.from({ length: 8 }, () => randomBytes(32));
+    const mockLeaves = Array.from({ length: 64 }, () => randomBytes(32));
     mockLeaves[2] = userPk;
 
     const { root, proof, directions } = buildMerkleTree(mockLeaves, 2, tempSim);
@@ -122,5 +101,18 @@ describe("Private Allowlist Access Smart Contract Tests", () => {
 
     // Try to claim again
     expect(() => simulator.claimMintSpot()).toThrow("failed assert: Voter has already claimed their spot");
+  });
+  it('accepts all 64 unique members without rotating the root', () => {
+    const secrets = Array.from({ length: 64 }, () => randomBytes(32));
+    const helper = setupSimulator(secrets[0], [], [], dummyRoot);
+    const leaves = secrets.map(secret => helper.publicKey(secret));
+    const first = buildMerkleTree(leaves, 0, helper);
+    const simulator = setupSimulator(secrets[0], first.proof, first.directions, first.root);
+    for (let index = 0; index < 64; index++) {
+      const membership = buildMerkleTree(leaves, index, helper);
+      simulator.switchUser(secrets[index], membership.proof, membership.directions);
+      expect(simulator.claimMintSpot().minted_count).toBe(BigInt(index + 1));
+    }
+    expect(() => simulator.claimMintSpot()).toThrow();
   });
 });
